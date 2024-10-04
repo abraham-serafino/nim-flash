@@ -60,8 +60,6 @@ proc getTodaysCards*(db: DBConn): seq[Card] =
     $ord(Medium), $fourDaysAgo, $ord(Easy), $lastWeek, $ord(Mastering),
     $threeWeeksAgo, $sixWeeksAgo)
 
-  echo query
-
   rows := db.getAllRows(sql(query))
 
   for row in items(rows):

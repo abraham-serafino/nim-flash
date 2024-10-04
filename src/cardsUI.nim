@@ -1,4 +1,5 @@
-import db_connector/db_sqlite,
+import
+  db_connector/db_sqlite,
   noise,
   strformat,
   sequtils,
@@ -7,9 +8,10 @@ import db_connector/db_sqlite,
   db as database,
   cardsModel
 
-var db: DBConn = nil
-var isEof = false
-var nimNoise = Noise.init()
+var
+  db: DBConn = nil
+  isEof = false
+  nimNoise = Noise.init()
 
 template getLine (prompt: string): string =
   nimNoise.setPrompt(prompt)

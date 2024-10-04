@@ -1,4 +1,5 @@
-import db_connector/db_sqlite,
+import
+  db_connector/db_sqlite,
   lib/operators
 
 var db: DbConn = nil
