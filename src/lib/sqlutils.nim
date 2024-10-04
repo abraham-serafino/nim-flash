@@ -1,17 +1,11 @@
-import strutils, strformat, operators
+import strutils
 
-type SqlParamError = object of CatchableError
+template escapeTicks (s: string): string =
+  s.replace("'", "''")
 
-proc setParams*(s: string, args: varargs[string]): string =
-  len := args.len
-  result = s
+proc sanitize (args: seq[string]): seq[string] =
+  for i in 0 ..< args.len:
+    result.add(escapeTicks(args[i]))
 
-  for i in 0 ..< len:
-    placeholder := fmt"${i + 1}"
-
-    if not s.contains(placeholder):
-      raise newException(SqlParamError,
-        "Mismatch between number of params and number of placeholders")
-
-    escaped := args[i].replace("'", "''")
-    result = result.replace(placeholder, fmt"'{escaped}'")
+proc setParams*(query: string, params: varargs[string]): string =
+  result = query.replace("$#", "'$#'") % sanitize(@params)
