@@ -19,7 +19,7 @@ template getLine (prompt: string): string =
 
   nimNoise.getLine
 
-proc addCards () =
+proc addCards =
   assert(db != nil, "Database must be initialized.")
 
   var totalCards = 0
@@ -99,7 +99,7 @@ proc reviewCards (reviewList: var seq[Card],
   # /while cards.len >= 1
 # /proc reviewCards
 
-proc practice () =
+proc practice =
   assert(db != nil, "Database must be initialized.")
 
   var allCards = getTodaysCards(db)
@@ -151,16 +151,15 @@ proc practice () =
   # /while firstTen.len > 0
 # /proc practice
 
-template displayOptions () =
+template displayOptions =
   echo "What would you like to do?"
   echo "(A)dd cards manually"
   echo "(P)ractice"
   echo "(Q)uit"
   echo ""
 
-proc showMenu*() =
+proc showMenu* =
   db = getDb()
-  defer: db.close()
 
   while true:
     displayOptions()
@@ -174,4 +173,6 @@ proc showMenu*() =
     of "Q", "q": break
     else: echo ""
   # /while true
+
+  db.close()
 # /proc showMenu
