@@ -22,14 +22,15 @@ type
     back*: string
     rank*: CardRank
 
-proc createCard*(db: DbConn, front: string, back: string) =
-  currentTime := now().utc
+template currentUnixUtcTime: int64 =
+  now().utc.toTime().toUnix()
 
+proc createCard*(db: DbConn, front: string, back: string) =
   query := setParams("""
     INSERT INTO card
     (front, back, last_seen, rank_id)
     VALUES ($#, $#, $#, $#)
-  """, front, back, $currentTime, $ord(New))
+  """, front, back, $currentUnixUtcTime(), $ord(New))
 
   db.exec(sql(query))
 
@@ -67,7 +68,7 @@ proc getTodaysCards*(db: DBConn): seq[Card] =
     card.id = row[0]
     card.front = row[1]
     card.back = row[2]
-    card.rank = cast[CardRank](parseInt(row[3]))
+    card.rank = CardRank(parseInt(row[3]))
 
     result.add(card)
 # /proc getTodaysCards
@@ -80,7 +81,7 @@ proc updateRanks(db: DBConn, cards: seq[Card]) =
     UPDATE card
       SET rank_id = rs.rank_id, last_seen = $#
       FROM (
-  """, $now().utc)
+  """, $currentUnixUtcTime())
 
   for i in 0 ..< len:
     card := cards[i]
@@ -99,7 +100,7 @@ proc incrementRanks*(db: DBConn, cards: var seq[Card]) =
     result = card
 
     if card.rank < Mastered:
-      result.rank = cast[CardRank](ord(card.rank) + 1)
+      result.rank = CardRank(ord(card.rank) + 1)
   )
 
   updateRanks(db, newCards)
@@ -111,7 +112,7 @@ proc decrementRanks*(db: DBConn, cards: var seq[Card],
     result = card
 
     if ord(card.rank) - amount >= ord(New):
-      result.rank = cast[CardRank](ord(card.rank) - amount)
+      result.rank = CardRank(ord(card.rank) - amount)
   )
 
   updateRanks(db, newCards)
