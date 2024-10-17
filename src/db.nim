@@ -1,11 +1,11 @@
-import
-  db_connector/db_sqlite,
-  lib/operators
+import db_connector/db_sqlite
 
 var db: DbConn = nil
 
-proc getDb*(): DbConn =
-  if db == nil: db = open("cards.db", "", "", "")
+proc getDb* (): DbConn =
+  if db == nil:
+    db = open("cards.db", "", "", "")
+
   result = db
 
   db.exec(sql"""
@@ -25,7 +25,7 @@ proc getDb*(): DbConn =
     )
   """)
 
-  queryResult := db.getAllRows(sql"""
+  let queryResult = db.getAllRows(sql"""
     SELECT * FROM card_rank
   """)
 

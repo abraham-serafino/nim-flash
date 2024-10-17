@@ -1,27 +1,21 @@
 import
   db_connector/db_sqlite,
-  noise,
+  rdstdin,
   strformat,
+  strutils,
   sequtils,
   lib/aryutils,
-  lib/operators,
   db as database,
   cardsModel
 
-var
-  db: DBConn = nil
-  isEof = false
-  nimNoise = Noise.init()
+let db = getDb()
 
-template getLine (prompt: string): string =
-  nimNoise.setPrompt(prompt)
+proc getLine (prompt: string, input: var string): bool =
+  var rawInput: string
+  result = readLineFromStdin(prompt, rawInput)
+  input = rawInput.toLowerAscii
 
-  let ok = nimNoise.readLine()
-  isEof = not ok
-
-  nimNoise.getLine
-
-proc addCards =
+proc addCards () =
   assert(db != nil, "Database must be initialized.")
 
   var totalCards = 0
@@ -30,43 +24,51 @@ proc addCards =
   echo "Press 'Ctrl+D' when you are finished entering cards"
   echo ""
 
+  var
+    front: string
+    back: string
+
   while true:
-    front := getLine("front: ")
-    if isEof: break
+    if not getLine("front: ", front): break
+    if not getLine("back: ", back): break
 
-    back := getLine("back: ")
-    if isEof: break
+    var input: string
 
-    while not isEof:
-      input := getLine(&"front: {front} - back: {back} (Y/n) ")
+    while true:
+      let ok =
+        readLineFromStdin(&"front: {front} - back: {back} (Y/n) ",
+          input)
 
+      if not ok: break
       if input == "n": break
 
       if input == "y" or input == "":
-        createCard(db, front, back)
+        db.createCard(front, back)
         inc totalCards
 
         if totalCards == 1: echo "Added 1 card."
         else: echo &"Added {totalCards} cards so far."
 
         break
-    # /while not isEof
+    # /while true
 
     echo ""
   # /while true
 # /proc addCards
 
-proc reviewSingleCard (card: Card, reviewList: var seq[Card]): bool =
-  answer := getLine(&"{card.front}\n-> ")
-  if isEof: return false
+proc reviewSingleCard (card: Card, reviewList: var seq[Card]):
+    (bool, bool) =
 
-  if answer != card.back:
+  var answer: string
+  let ok = getLine(&"{card.front} -> ", answer)
+
+  if answer == card.back:
+    echo "Right!"
+    result = (ok, true)
+  else:
     reviewList.add(card)
     echo &"({card.back})"
-    result = false
-  else:
-    echo "Right!"
-    result = true
+    result = (ok, false)
 
   echo ""
 # /proc reviewSingleCard
@@ -77,19 +79,19 @@ proc reviewCards (reviewList: var seq[Card],
   var reviewLen = reviewList.len
   if reviewLen <= 0: return
 
-  shuffle[Card](reviewList)
+  shuffle(reviewList)
 
   var cardsReviewed = 0
-  var cards = unshift[Card](reviewList)
+  var cards = unshift(reviewList)
 
   while cards.len >= 1:
-    card := cards[0]
+    let card = cards[0]
 
-    discard reviewSingleCard(card, reviewList)
-    if isEof: return
+    let (ok, isCorrectAnswer) = reviewSingleCard(card, reviewList)
+    if not ok: return
 
     inc cardsReviewed
-    cards = unshift[Card](reviewList)
+    cards = unshift(reviewList)
 
     if cards.len >= 1 and cardsReviewed >= reviewLen:
       if singleIteration:
@@ -97,20 +99,20 @@ proc reviewCards (reviewList: var seq[Card],
         break
       else:
         reviewLen = reviewList.len
-        shuffle[Card](reviewList)
+        shuffle(reviewList)
   # /while cards.len >= 1
 # /proc reviewCards
 
-proc practice =
+proc practice () =
   assert(db != nil, "Database must be initialized.")
 
   var allCards = getTodaysCards(db)
-  shuffle[Card](allCards)
+  shuffle(allCards)
 
-  var firstTen = unshift[Card](ary = allCards, howMany = 10)
+  var firstTen = allCards.unshift(howMany = 10)
 
   while firstTen.len > 0:
-    len := allCards.len + firstTen.len
+    let len = allCards.len + firstTen.len
 
     echo ""
     if len == 1: echo "1 card left to review..."
@@ -123,58 +125,57 @@ proc practice =
 
     # first pass: separate correct from incorrect
     for card in items(firstTen):
-      isCorrectAnswer := reviewSingleCard(card, reviewList)
-      if isEof: return
+      let (ok, isCorrectAnswer) = reviewSingleCard(card, reviewList)
+      if not ok: return
 
       if isCorrectAnswer:
         if card.rank == New: reviewList.add(card)
         complete.add(card)
-      else:
-        incorrectCards.add(card)
 
-    reviewList = reviewList.concat(incorrectCards)
+      else: incorrectCards.add(card)
+
+    reviewList &= incorrectCards
 
     # second pass: do not decrement ranks yet
-    reviewCards(reviewList = reviewList, singleIteration = true)
+    reviewCards(reviewList, singleIteration = true)
 
-    var stillIncorrect = reviewList.filter(proc (card: Card): bool =
-      return incorrectCards.count(card) > 0
+    var stillIncorrect = reviewList.filter(
+      proc (card: Card): bool =
+        return card in incorrectCards
     )
 
     # third pass: continue cycling through the cards until there are
     # none left.
     reviewCards(reviewList)
 
-    incrementRanks(db, complete)
-    decrementRanks(db, incorrectCards)
-    decrementRanks(db, stillIncorrect, 2)
+    db.incrementRanks(complete)
+    db.decrementRanks(incorrectCards)
+    db.decrementRanks(stillIncorrect, 2)
 
-    firstTen = unshift[Card](ary = allCards, howMany = 10)
+    firstTen = allCards.unshift(howMany = 10)
   # /while firstTen.len > 0
 # /proc practice
 
-template displayOptions =
+proc displayOptions () =
   echo "What would you like to do?"
   echo "(A)dd cards manually"
   echo "(P)ractice"
   echo "(Q)uit"
   echo ""
 
-proc showMenu* =
-  db = getDb()
+proc showMenu* () =
+  var input: string
 
   while true:
     displayOptions()
 
-    input := getLine("(P) ")
-    if isEof: break
+    let ok = getLine("(P) ", input)
+    if not ok: break
 
     case input
-    of "A", "a": addCards()
-    of "P", "p", "": practice()
-    of "Q", "q": break
+    of "a": addCards()
+    of "p", "": practice()
+    of "q": break
     else: echo ""
   # /while true
-
-  db.close()
 # /proc showMenu

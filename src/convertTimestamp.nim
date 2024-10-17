@@ -1,25 +1,27 @@
 import
   db_connector/db_sqlite,
   times,
-  lib/operators,
   lib/sqlutils
 
-type CardRow = object
-  id: string
-  lastSeen: string
+type
+  CardRow = object
+    id: string
+    lastSeen: string
 
-db := open("cards.db", "", "", "")
+let db = open("cards.db", "", "", "")
 
-template toTimestamp(lastSeen: string): int =
+template toTimestamp (lastSeen: string): int =
   parseTime(lastSeen, "yyyy-MM-dd'T'HH:mm:ss'Z'", utc()).toUnix()
 
-proc main =
-  findQuery := """
-    SELECT id, last_seen
-    FROM card
-  """
+proc main () =
+  let
+    findQuery = """
+      SELECT id, last_seen
+      FROM card
+    """
 
-  rows := db.getAllRows(sql(findQuery))
+    rows = db.getAllRows(sql(findQuery))
+    rowsLen = rows.len - 1
 
   var insertQuery = """
     UPDATE card
@@ -27,10 +29,7 @@ proc main =
     FROM (
   """
 
-  rowsLen := rows.len - 1
-
-  for i in 0 .. rowsLen:
-    row := rows[i]
+  for i, row in rows:
     if i != 0: insertQuery &= " UNION "
 
     insertQuery &= setParams("SELECT $# as id, $# as last_seen",
@@ -38,7 +37,6 @@ proc main =
 
   insertQuery &=  ") rs WHERE card.id = rs.id"
 
-  # echo insertQuery
   db.exec(sql(insertQuery))
 
 main()
