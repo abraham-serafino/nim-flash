@@ -25,11 +25,11 @@ let currentUnixUtcTime =
   $now().utc.toTime().toUnix()
 
 proc createCard* (db: DbConn, front: string, back: string) =
-  let query = setParams("""
+  let query = """
     INSERT INTO card
     (front, back, last_seen, rank_id)
     VALUES ($#, $#, $#, $#)
-  """, front, back, currentUnixUtcTime, $ord(New))
+  """.setParams(front, back, currentUnixUtcTime, $ord(New))
 
   db.exec(sql(query))
 
@@ -43,7 +43,7 @@ proc getTodaysCards* (db: DBConn): seq[Card] =
     threeWeeksAgo = toUnix(now - 3.weeks)
     sixWeeksAgo = toUnix(now - 6.weeks)
 
-    query = setParams("""
+    query = """
       SELECT c.id, front, back, rank_id
         FROM card c
         WHERE rank_id = $#
@@ -53,7 +53,7 @@ proc getTodaysCards* (db: DBConn): seq[Card] =
           OR (rank_id = $# AND last_seen <= $#)
           OR (rank_id = $# AND last_seen <= $#)
           OR last_seen <= $#
-    """, $ord(New), $ord(Learning), $today, $ord(Hard), $twoDaysAgo,
+    """.setParams($ord(New), $ord(Learning), $today, $ord(Hard), $twoDaysAgo,
       $ord(Medium), $fourDaysAgo, $ord(Easy), $lastWeek,
       $ord(Mastering), $threeWeeksAgo, $sixWeeksAgo)
 
@@ -73,18 +73,18 @@ proc updateRanks (db: DBConn, cards: seq[Card]) =
   let len = cards.len
   if len <= 0: return
 
-  var query = setParams("""
+  var query = """
     UPDATE card
       SET rank_id = rs.rank_id, last_seen = $#
       FROM (
-  """, currentUnixUtcTime)
+  """.setParams(currentUnixUtcTime)
 
   for i in 0 ..< len:
     let card = cards[i]
     if i != 0: query &= " UNION "
 
-    query &= setParams("SELECT $# AS id, $# AS rank_id ",
-      card.id, $ord(card.rank))
+    query &= "SELECT $# AS id, $# AS rank_id ".
+      setParams(card.id, $ord(card.rank))
 
   query &= " ) rs WHERE card.id = rs.id"
 
