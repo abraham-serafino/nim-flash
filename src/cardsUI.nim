@@ -1,19 +1,20 @@
 import
   db_connector/db_sqlite,
-  rdstdin,
   strformat,
   strutils,
   sequtils,
+  noise,
   lib/aryutils,
   db as database,
   cardsModel
 
+var n = Noise.init()
 let db = getDb()
 
 proc getLine (prompt: string, input: var string): bool =
-  var rawInput: string
-  result = readLineFromStdin(prompt, rawInput)
-  input = rawInput.toLowerAscii
+  n.setPrompt(prompt)
+  result = n.readLine()
+  input = n.getLine
 
 proc addCards () =
   assert(db != nil, "Database must be initialized.")
@@ -35,9 +36,7 @@ proc addCards () =
     var input: string
 
     while true:
-      let ok =
-        readLineFromStdin(&"front: {front} - back: {back} (Y/n) ",
-          input)
+      let ok = getLine(&"front: {front} - back: {back} (Y/n) ", input)
 
       if not ok: break
       if input == "n": break
@@ -172,7 +171,7 @@ proc showMenu* () =
     let ok = getLine("(P) ", input)
     if not ok: break
 
-    case input
+    case input.strip.toLowerAscii
     of "a": addCards()
     of "p", "": practice()
     of "q": break
